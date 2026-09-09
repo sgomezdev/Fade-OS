@@ -17,7 +17,7 @@ export function createApp() {
   const app = express();
 
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+  app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
   app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
   app.use(express.json());
@@ -35,14 +35,14 @@ export function createApp() {
   app.use("/api/gastos-fijos", gastosFijosRoutes);
   app.use("/api/deudas-barbero", deudasBarberoRoutes);
 
-  const rutaFrontend = path.join(__dirname, "public");
+  const rutaFrontend = path.join(__dirname, "../public");
   app.use(express.static(rutaFrontend));
 
   // Cualquier ruta que NO sea /api/... devuelve el index.html del frontend
   app.get(/^(?!\/api).*/, (req, res) => {
     res.sendFile(path.join(rutaFrontend, "index.html"));
   });
-  
+
   app.use(notFound);
   app.use(errorHandler);
 
