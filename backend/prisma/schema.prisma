@@ -1,0 +1,151 @@
+
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Barbero: cada profesional de la barbería. Usado para comisiones.
+// ─────────────────────────────────────────────────────────────
+model Barbero {
+  id            Int          @id @default(autoincrement())
+  nombre        String
+  telefono      String?
+  // Porcentaje de comisión sobre los servicios (ej: 40.0 = 40%)
+  comisionPct   Float        @default(0)
+  activo        Boolean      @default(true)
+  creadoEn      DateTime     @default(now())
+
+  movimientos   Movimiento[]
+  deudas DeudaBarbero[]
+
+  @@map("barberos")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Categoria: clasifica ingresos y egresos (Corte, Barba, Arriendo, etc.)
+// ─────────────────────────────────────────────────────────────
+model Categoria {
+  id          Int          @id @default(autoincrement())
+  nombre      String       @unique
+  // Define si la categoría aplica a INGRESO o EGRESO (validado con Zod en la API)
+  tipo        String
+  color       String       @default("#3b82f6") // para la UI
+  activo      Boolean      @default(true)
+
+  movimientos Movimiento[]
+
+  @@map("categorias")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Movimiento: cada entrada o salida de dinero de la caja.
+// Es el corazón del sistema.
+// ─────────────────────────────────────────────────────────────
+model Movimiento {
+  id           Int            @id @default(autoincrement())
+  tipo         String         // "INGRESO" | "EGRESO" (validado con Zod)
+  monto        Int
+  concepto     String         // "Corte + barba", "Compra de shampoo", etc.
+  metodoPago   String         @default("EFECTIVO") // EFECTIVO | TARJETA | NEQUI | TRANSFERENCIA | OTRO
+  tipoItem     String?
+  fecha        DateTime       @default(now())
+
+  // Relaciones opcionales
+  categoriaId  Int?
+  categoria    Categoria?     @relation(fields: [categoriaId], references: [id])
+  barberoId    Int?
+  barbero      Barbero?       @relation(fields: [barberoId], references: [id])
+  // A qué sesión de caja pertenece (día de trabajo)
+  sesionId     Int?
+  sesion       SesionCaja?    @relation(fields: [sesionId], references: [id])
+
+  creadoEn     DateTime       @default(now())
+
+  productoId  Int?
+  producto    Producto? @relation(fields: [productoId], references: [id])
+  cantidad    Int?
+  costoUnitario Int? 
+  color       String?
+
+  @@index([fecha])
+  @@index([tipo])
+  @@map("movimientos")
+}
+
+// ─────────────────────────────────────────────────────────────
+// SesionCaja: apertura y cierre de la caja de un día.
+// Permite cuadrar el efectivo esperado vs. el real.
+// ─────────────────────────────────────────────────────────────
+model SesionCaja {
+  id              Int          @id @default(autoincrement())
+  fecha           DateTime     @default(now())
+  montoInicial    Float        @default(0)   // fondo de caja al abrir
+  // Se calculan al cerrar:
+  cierreEsperado  Float?                      // inicial + ingresos - egresos (efectivo)
+  cierreReal      Float?                      // lo que se contó físicamente
+  diferencia      Float?                      // real - esperado (sobrante/faltante)
+  estado          String       @default("ABIERTA") // "ABIERTA" | "CERRADA"
+  notas           String?
+  abiertaEn       DateTime     @default(now())
+  cerradaEn       DateTime?
+
+  movimientos     Movimiento[]
+
+  @@map("sesiones_caja")
+}
+
+model Producto {
+  id           Int      @id @default(autoincrement())
+  nombre       String
+  categoria    String   @default("BEBIDA")
+  stock        Int      @default(0)
+  costo        Int
+  precioVenta  Int
+  stockMinimo  Int      @default(2)
+  imagen       String?
+  color        String? 
+  activo       Boolean  @default(true)
+  creadoEn     DateTime @default(now())
+  movimientos  Movimiento[]
+  deudas DeudaBarbero[]
+}
+
+model Negocio {
+  id            Int      @id @default(1)
+  nombre        String   @default("Mi Barbería")
+  logo          String?
+  colorAcento   String?
+  actualizadoEn DateTime @updatedAt
+  mostrarGastosFijos Boolean @default(false)
+}
+
+model GastoFijo {
+  id             Int       @id @default(autoincrement())
+  nombre         String
+  monto          Int
+  frecuenciaDias Int
+  ultimoPago     DateTime?
+  activo         Boolean   @default(true)
+  creadoEn       DateTime  @default(now())
+  color          String?
+}
+
+model DeudaBarbero {
+  id         Int       @id @default(autoincrement())
+  barberoId  Int
+  barbero    Barbero   @relation(fields: [barberoId], references: [id])
+  concepto   String
+  monto      Int
+  productoId Int?
+  producto   Producto? @relation(fields: [productoId], references: [id])
+  cantidad   Int?
+  saldado    Boolean   @default(false)
+  creadoEn   DateTime  @default(now())
+}

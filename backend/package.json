@@ -1,0 +1,51 @@
+{
+  "name": "manhattan-caja-backend",
+  "version": "1.0.0",
+  "description": "API para el control de caja diario de Manhattan Barbershop",
+  "type": "module",
+  "main": "src/server.js",
+  "bin": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:seed": "node prisma/seed.js",
+    "db:studio": "prisma studio",
+    "build:js": "node build.js"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "keywords": [
+    "caja",
+    "barbershop",
+    "express",
+    "prisma",
+    "sqlite"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "cors": "^2.8.5",
+    "dayjs": "^1.11.13",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^2.3.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.22.0",
+    "esbuild": "^0.28.2",
+    "prisma": "^5.22.0",
+    "rcedit": "^5.0.2"
+  },
+  "allowScripts": {
+    "@prisma/client@5.22.0": true,
+    "@prisma/engines@5.22.0": true,
+    "prisma@5.22.0": true,
+    "esbuild@0.28.2": true
+  }
+}
