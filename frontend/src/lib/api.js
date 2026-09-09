@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Instancia de axios apuntando a nuestro backend.
 export const api = axios.create({
-  baseURL: `http://${window.location.hostname}:4000/api`,
+  baseURL: "/api",
 });
 
 export async function getResumenDia(fecha) {
