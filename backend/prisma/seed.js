@@ -3,27 +3,27 @@ import dayjs from "dayjs";
 
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log("🌱 Sembrando datos de ejemplo...");
+const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const METODOS = ["EFECTIVO", "EFECTIVO", "EFECTIVO", "NEQUI", "TARJETA", "TRANSFERENCIA"];
 
-  // Limpiar datos previos (orden importa por las relaciones)
+async function main() {
+  console.log("🌱 Sembrando datos de demo...");
+
+  // Limpiar todo (orden importa por las relaciones)
+  await prisma.deudaBarbero.deleteMany();
   await prisma.movimiento.deleteMany();
   await prisma.sesionCaja.deleteMany();
-  await prisma.categoria.deleteMany();
+  await prisma.gastoFijo.deleteMany();
+  await prisma.producto.deleteMany();
   await prisma.barbero.deleteMany();
+  await prisma.categoria.deleteMany();
 
-  // Categorías
-  const categorias = await Promise.all([
-    prisma.categoria.create({ data: { nombre: "Corte", tipo: "INGRESO", color: "#3b82f6" } }),
-    prisma.categoria.create({ data: { nombre: "Barba", tipo: "INGRESO", color: "#8b5cf6" } }),
-    prisma.categoria.create({ data: { nombre: "Corte + Barba", tipo: "INGRESO", color: "#06b6d4" } }),
-    prisma.categoria.create({ data: { nombre: "Productos", tipo: "INGRESO", color: "#10b981" } }),
-    prisma.categoria.create({ data: { nombre: "Arriendo", tipo: "EGRESO", color: "#ef4444" } }),
-    prisma.categoria.create({ data: { nombre: "Insumos", tipo: "EGRESO", color: "#f59e0b" } }),
-    prisma.categoria.create({ data: { nombre: "Servicios", tipo: "EGRESO", color: "#ec4899" } }),
-  ]);
-
-  const cat = (nombre) => categorias.find((c) => c.nombre === nombre).id;
+  // Negocio (config de marca) — singleton id=1
+  await prisma.negocio.upsert({
+    where: { id: 1 },
+    update: { nombre: "FadeOS Barbershop", colorAcento: "#0f172a", mostrarGastosFijos: true },
+    create: { id: 1, nombre: "FadeOS Barbershop", colorAcento: "#0f172a", mostrarGastosFijos: true },
+  });
 
   // Barberos
   const [carlos, andres, miguel] = await Promise.all([
@@ -31,70 +31,149 @@ async function main() {
     prisma.barbero.create({ data: { nombre: "Andrés Gómez", comisionPct: 40, telefono: "3004445566" } }),
     prisma.barbero.create({ data: { nombre: "Miguel Torres", comisionPct: 50, telefono: "3007778899" } }),
   ]);
-
   const barberos = [carlos.id, andres.id, miguel.id];
-  const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
-  const metodos = ["EFECTIVO", "EFECTIVO", "NEQUI", "TARJETA", "TRANSFERENCIA"];
+  const nombreDe = (id) => [carlos, andres, miguel].find((b) => b.id === id).nombre;
 
-  // Generar movimientos de los últimos 20 días
+  // Productos (inventario)
+  const productos = await Promise.all([
+    prisma.producto.create({ data: { nombre: "Coca-Cola 400ml", categoria: "BEBIDA", stock: 18, costo: 2000, precioVenta: 4000, color: "#ef4444" } }),
+    prisma.producto.create({ data: { nombre: "Agua con gas", categoria: "BEBIDA", stock: 22, costo: 1500, precioVenta: 3500, color: "#3b82f6" } }),
+    prisma.producto.create({ data: { nombre: "Cerveza Club Colombia", categoria: "BEBIDA", stock: 12, costo: 3500, precioVenta: 7000, color: "GOLD" } }),
+    prisma.producto.create({ data: { nombre: "Cera mate", categoria: "CAPILAR", stock: 9, costo: 12000, precioVenta: 25000, color: "#8b5cf6" } }),
+    prisma.producto.create({ data: { nombre: "Shampoo anticaída", categoria: "CAPILAR", stock: 6, costo: 15000, precioVenta: 32000, color: "SILVER" } }),
+  ]);
+  const bebidas = productos.filter((p) => p.categoria === "BEBIDA");
+  const capilares = productos.filter((p) => p.categoria === "CAPILAR");
+
+  // Gastos fijos
+  await prisma.gastoFijo.createMany({
+    data: [
+      { nombre: "Arriendo del local", monto: 1200000, frecuenciaDias: 30, color: "#f43f5e" },
+      { nombre: "Sueldo administrador", monto: 900000, frecuenciaDias: 15, color: "#3b82f6" },
+      { nombre: "Internet y servicios", monto: 150000, frecuenciaDias: 30, color: "#94a3b8" },
+    ],
+  });
+
+  const SERVICIOS = [
+    { concepto: "Corte de cabello", monto: 20000 },
+    { concepto: "Arreglo de barba", monto: 15000 },
+    { concepto: "Corte + barba", monto: 30000 },
+    { concepto: "Diseño y línea", monto: 18000 },
+  ];
+
   const movimientos = [];
-  for (let d = 19; d >= 0; d--) {
+
+  for (let d = 24; d >= 0; d--) {
     const dia = dayjs().subtract(d, "day");
-    // Domingo con menos actividad
     const esDomingo = dia.day() === 0;
     const numServicios = esDomingo ? 3 : 6 + Math.floor(Math.random() * 6);
 
     for (let i = 0; i < numServicios; i++) {
-      const servicios = [
-        { concepto: "Corte de cabello", catNombre: "Corte", monto: 20000 },
-        { concepto: "Arreglo de barba", catNombre: "Barba", monto: 15000 },
-        { concepto: "Corte + barba", catNombre: "Corte + Barba", monto: 30000 },
-        { concepto: "Venta de cera", catNombre: "Productos", monto: 25000 },
-      ];
-      const s = rand(servicios);
+      const s = rand(SERVICIOS);
+      const barberoId = rand(barberos);
       movimientos.push({
         tipo: "INGRESO",
+        tipoItem: "SERVICIO",
         monto: s.monto,
         concepto: s.concepto,
-        metodoPago: rand(metodos),
-        categoriaId: cat(s.catNombre),
-        barberoId: rand(barberos),
+        metodoPago: rand(METODOS),
+        barberoId,
         fecha: dia.hour(9 + i).minute(Math.floor(Math.random() * 59)).toDate(),
+      });
+
+      if (Math.random() > 0.7) {
+        movimientos.push({
+          tipo: "INGRESO",
+          tipoItem: "PROPINA",
+          monto: rand([3000, 5000, 8000, 10000]),
+          concepto: `Propina - ${nombreDe(barberoId)}`,
+          metodoPago: "EFECTIVO",
+          barberoId,
+          fecha: dia.hour(9 + i).minute(Math.floor(Math.random() * 59)).toDate(),
+        });
+      }
+    }
+
+    if (Math.random() > 0.5) {
+      const p = rand(bebidas);
+      const cantidad = 1 + Math.floor(Math.random() * 2);
+      movimientos.push({
+        tipo: "INGRESO",
+        tipoItem: "BEBIDA",
+        monto: p.precioVenta * cantidad,
+        concepto: p.nombre,
+        metodoPago: rand(METODOS),
+        productoId: p.id,
+        cantidad,
+        costoUnitario: p.costo,
+        fecha: dia.hour(14).minute(0).toDate(),
       });
     }
 
-    // Un egreso ocasional
-    if (Math.random() > 0.6) {
+    if (Math.random() > 0.75) {
+      const p = rand(capilares);
+      const barberoId = rand(barberos);
+      movimientos.push({
+        tipo: "INGRESO",
+        tipoItem: "CAPILAR",
+        monto: p.precioVenta,
+        concepto: p.nombre,
+        metodoPago: rand(METODOS),
+        barberoId,
+        productoId: p.id,
+        cantidad: 1,
+        costoUnitario: p.costo,
+        fecha: dia.hour(16).minute(0).toDate(),
+      });
+    }
+
+    if (Math.random() > 0.75) {
       const egresos = [
-        { concepto: "Compra de shampoo y cera", catNombre: "Insumos", monto: 45000 },
-        { concepto: "Pago de energía", catNombre: "Servicios", monto: 60000 },
-        { concepto: "Cuchillas y navajas", catNombre: "Insumos", monto: 30000 },
+        { concepto: "Cuchillas y navajas", monto: 30000 },
+        { concepto: "Toallas y aseo", monto: 20000 },
+        { concepto: "Mantenimiento de máquinas", monto: 45000 },
       ];
       const e = rand(egresos);
       movimientos.push({
         tipo: "EGRESO",
+        tipoItem: "OTRO",
         monto: e.monto,
         concepto: e.concepto,
         metodoPago: "EFECTIVO",
-        categoriaId: cat(e.catNombre),
         fecha: dia.hour(18).minute(0).toDate(),
       });
     }
   }
 
-  // Arriendo el día 1 del mes actual
   movimientos.push({
     tipo: "EGRESO",
-    monto: 800000,
+    tipoItem: "COMPRA_INVENTARIO",
+    monto: 180000,
+    concepto: "Pedido de bebidas y productos capilares",
+    metodoPago: "TRANSFERENCIA",
+    fecha: dayjs().subtract(5, "day").hour(10).toDate(),
+  });
+
+  movimientos.push({
+    tipo: "EGRESO",
+    tipoItem: "GASTO_FIJO",
+    monto: 1200000,
     concepto: "Arriendo del local",
     metodoPago: "TRANSFERENCIA",
-    categoriaId: cat("Arriendo"),
     fecha: dayjs().startOf("month").hour(10).toDate(),
   });
 
   await prisma.movimiento.createMany({ data: movimientos });
 
-  console.log(`✅ Listo: ${categorias.length} categorías, 3 barberos, ${movimientos.length} movimientos.`);
+  await prisma.sesionCaja.create({
+    data: { fecha: dayjs().startOf("day").toDate(), montoInicial: 100000, estado: "ABIERTA" },
+  });
+
+  await prisma.deudaBarbero.create({
+    data: { barberoId: andres.id, concepto: "Retiro de caja", monto: 20000, saldado: false },
+  });
+
+  console.log(`✅ Listo: 3 barberos, ${productos.length} productos, 3 gastos fijos, ${movimientos.length} movimientos.`);
 }
 
 main()
